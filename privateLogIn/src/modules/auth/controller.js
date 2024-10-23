@@ -6,7 +6,7 @@ const response = require('../../utils/responses.js');
 const cookieProperties = require('./../../utils/cookieProperties.js')
 const bcrypt = require('bcrypt');
 const {generateAccessToken,generateRefreshToken, getRefreshMaxAgeMili} = require('../../jsonWebToken/utils.js')
-const {getAuthByUsername, editPassword} = require('../../databaseUtils/userUtils/auth.js');
+const {getAuthByUsername, editPassword, getAuth} = require('../../databaseUtils/userUtils/auth.js');
 const {createSession, deleteSession} = require('../../databaseUtils/userUtils/session.js');
 const { createUser, getUser}= require('../../databaseUtils/userUtils/user.js');
 
@@ -126,6 +126,13 @@ async function changePassword(req, res)
             return;
         }
         const body = validation.value;
+
+        const auth = await getAuth(params.id);
+        if(!auth)
+        {
+            response.error(req,res,'No se encuentra un usuario con el ID proporcionado',404);
+            return; 
+        }
 
         const authAdmin = await getAuthByUsername(res.locals.username);
 

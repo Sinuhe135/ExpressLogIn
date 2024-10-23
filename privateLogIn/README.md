@@ -82,8 +82,7 @@ RESTful API con LogIn para sistema privado
     "name": string min(3) max(30) required,
     "patLastName": string min(3) max(30) required,
     "matLastName": string min(3) max(30),
-    "phone": string min(3) max(15) required,
-    "commission": number min(0) max(99.99) precision(2)
+    "phone": string min(3) max(15) required
 }
 ```
 
