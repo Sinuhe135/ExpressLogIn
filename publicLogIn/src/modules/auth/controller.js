@@ -6,7 +6,7 @@ const response = require('../../utils/responses.js');
 const cookieProperties = require('./../../utils/cookieProperties.js')
 const bcrypt = require('bcrypt');
 const {generateAccessToken,generateRefreshToken, getRefreshMaxAgeMili} = require('../../jsonWebToken/utils.js')
-const {getAuthByUsername, editPassword, getAuth} = require('../../databaseUtils/userUtils/auth.js');
+const {getAuthByEmail, editPassword, getAuth} = require('../../databaseUtils/userUtils/auth.js');
 const {createSession, deleteSession} = require('../../databaseUtils/userUtils/session.js');
 const { createUser, getUser}= require('../../databaseUtils/userUtils/user.js');
 
@@ -21,17 +21,17 @@ async function login(req, res)
         }
         const body = validation.value;
     
-        const auth = await getAuthByUsername(body.username);
+        const auth = await getAuthByEmail(body.email);
         if(!auth)
         {
-            response.error(req,res,'Usuario o contraseña incorrectos',400);
+            response.error(req,res,'Correo o contraseña incorrectos',400);
             return;
         }
 
         const resultado = await bcrypt.compare(body.password,auth.password);
         if(!resultado)
         {
-            response.error(req,res,'Usuario o contraseña incorrectos',400);
+            response.error(req,res,'Correo o contraseña incorrectos',400);
             return;
         }
 
@@ -70,8 +70,9 @@ async function getCheck(req, res)
 {
     try {
         const type = res.locals.type;
+        const id = res.locals.idAuth;
 
-        response.success(req,res,{type:type},200);
+        response.success(req,res,{id:id,type:type},200);
     } catch (error) {
         console.log(`Hubo un error con ${req.method} ${req.originalUrl}`);
         console.log(error);
@@ -90,17 +91,17 @@ async function signup(req,res)
         }
         const body = validation.value;
     
-        const auth = await getAuthByUsername(body.username);
+        const auth = await getAuthByEmail(body.email);
         if(auth)
         {
-            response.error(req,res,'El nombre de usuario ya existe',400);
+            response.error(req,res,'El correo ya está registrado',400);
             return;
         }
     
         const passwordHash = await hashPassword(body.password);
-        const user = await createUser(body.name,body.patLastName,body.matLastName,body.phone,body.username,passwordHash,body.type);
+        const userId = await createUser(body.name,body.patLastName,body.matLastName,body.phone,body.email,passwordHash);
     
-        response.success(req,res,user,201);
+        response.success(req,res,{id:userId},201);
     } catch (error) {
         console.log(`Hubo un error con ${req.method} ${req.originalUrl}`);
         console.log(error);
@@ -111,14 +112,6 @@ async function signup(req,res)
 async function changePassword(req, res)
 {
     try {
-        let validation = validateParamId(req.params);
-        if(validation.error)
-        {
-            response.error(req,res,validation.error.details[0].message,400);
-            return;
-        }
-        const params = validation.value;
-
         validation = validateChangePassword(req.body);
         if(validation.error)
         {
@@ -127,26 +120,24 @@ async function changePassword(req, res)
         }
         const body = validation.value;
 
-        const auth = await getAuth(params.id);
+        const auth = await getAuthByEmail(res.locals.email);
         if(!auth)
         {
-            response.error(req,res,'No se encuentra un usuario con el ID proporcionado',404);
-            return; 
+            response.error(req,res,'Usuario no encontrado',400);
+            return;
         }
 
-        const authAdmin = await getAuthByUsername(res.locals.username);
-
-        const resultado = await bcrypt.compare(body.password,authAdmin.password);
+        const resultado = await bcrypt.compare(body.password,auth.password);
         if(!resultado)
         {
-            response.error(req,res,'Contraseña del administrador incorrecta',400);
+            response.error(req,res,'Contraseña incorrecta',400);
             return;
         }
 
         const passwordHash = await hashPassword(body.newPassword);
-        const newAuth = await editPassword(passwordHash, params.id, res.locals.idSession);
+        const newAuth = await editPassword(passwordHash, res.locals.idAuth, res.locals.idSession);
 
-        response.success(req,res,newAuth,201);
+        response.success(req,res,{id:newAuth},201);
     } catch (error) {
         console.log(`Hubo un error con ${req.method} ${req.originalUrl}`);
         console.log(error);
@@ -163,7 +154,7 @@ async function createJWTCookies(res, user)
 {
     const AccessObject = {
         id:user.id,
-        username:user.username,
+        email:user.email,
         type:user.type
     };
     const session = await createSession(user.id);

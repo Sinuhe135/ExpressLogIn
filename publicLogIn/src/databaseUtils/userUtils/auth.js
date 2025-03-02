@@ -2,13 +2,13 @@ const pool = require('../databaseCon.js');
 
 async function getAuth(id)
 {
-    const [rows] = await pool.query('select id,username from AUTH where id = ?',[id]);
+    const [rows] = await pool.query('select id,email from AUTH where id = ?',[id]);
     return rows[0];
 }
 
-async function getAuthByUsername(username)
+async function getAuthByEmail(email)
 {
-    const [rows] = await pool.query('select * from AUTH where username = ?',[username]);
+    const [rows] = await pool.query('select * from AUTH where email = ?',[email]);
     return rows[0]; 
 }
 
@@ -24,7 +24,7 @@ async function editPassword(password,idAuth,idCurrentSession)
         await conn.commit();
         conn.release();
 
-        return await getAuth(idAuth);
+        return await idAuth;
     } catch (error) {
         await conn.rollback();
         conn.release();
@@ -33,4 +33,4 @@ async function editPassword(password,idAuth,idCurrentSession)
     }   
 }
 
-module.exports={getAuthByUsername, getAuth, editPassword};
+module.exports={getAuthByEmail, getAuth, editPassword};

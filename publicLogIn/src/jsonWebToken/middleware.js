@@ -102,7 +102,7 @@ async function checkAccessToken(req,res, lookingTypes)
     }
     
     res.locals.idAuth = payload.id;
-    res.locals.username = payload.username;
+    res.locals.email = payload.email;
     res.locals.type = payload.type;
 
     return true;
@@ -145,7 +145,7 @@ async function updateAccessToken(res, session)
     
     const AccessObject = {
         id:user.id,
-        username:user.username,
+        email:user.email,
         type:user.type
     };
     

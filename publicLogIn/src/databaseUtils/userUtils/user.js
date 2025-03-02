@@ -27,8 +27,8 @@ async function getNumberOfPages()
 
 async function getUser(id)
 {
-    const dataSelection = 'USER.id, USER.name, USER.patLastName, USER.matLastName, USER.phone,USER.type, AUTH.username';
-    const [rows] = await pool.query('select ' + dataSelection + ' from USER left join AUTH on USER.id = AUTH.id where USER.active = 1 and USER.id = ?',[id]);
+    const dataSelection = 'USER.id, USER.name, USER.patLastName, USER.matLastName, USER.phone,USER.type, AUTH.email';
+    const [rows] = await pool.query('select ' + dataSelection + ' from USER left join AUTH on USER.id = AUTH.id where USER.active = active and USER.id = ?',[id]);
     return rows[0];
 }
 
@@ -60,19 +60,19 @@ async function editUser(name,patLastName,matLastName,phone,id)
     return await getUser(id);
 }
 
-async function createUser(name,patLastName,matLastName,phone,username,password,type)
+async function createUser(name,patLastName,matLastName,phone,email,password)
 {
     const conn = await pool.getConnection();
     try {
         await conn.beginTransaction();
     
-        const [result] = await conn.query('insert into USER (name,patLastName,matLastName,phone,type) values (?,?,?,?,?)',[name,patLastName,matLastName,phone,type]);
-        await conn.query(`insert into AUTH (id,username,password) values (${result.insertId},?,?)`,[username,password]);
+        const [result] = await conn.query('insert into USER (name,patLastName,matLastName,phone) values (?,?,?,?)',[name,patLastName,matLastName,phone]);
+        await conn.query(`insert into AUTH (id,email,password) values (${result.insertId},?,?)`,[email,password]);
     
         await conn.commit();
         conn.release();
 
-        return await getUser(result.insertId);
+        return await result.insertId;
     } catch (error) {
         await conn.rollback();
         conn.release();

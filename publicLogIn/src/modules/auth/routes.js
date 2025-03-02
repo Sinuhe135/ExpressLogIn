@@ -15,11 +15,11 @@ router.delete('/logout',requireLoggedIn, requireSession, async (req,res)=>{
     await controller.logout(req,res);
 });
 
-router.post('/signup',requireAdmin, async (req,res)=>{
+router.post('/signup',requireNotLoggedIn, async (req,res)=>{
     await controller.signup(req,res);
 });
 
-router.put('/changePassword/:id',requireAdmin,requireSession, async (req,res)=>{
+router.put('/changePassword',requireLoggedIn,requireSession, async (req,res)=>{
     await controller.changePassword(req,res);
 });
 
