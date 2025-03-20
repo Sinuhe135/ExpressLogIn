@@ -72,7 +72,7 @@ async function createUser(name,patLastName,matLastName,phone,email,password)
         await conn.commit();
         conn.release();
 
-        return await result.insertId;
+        return {id:result.insertId,email:email};
     } catch (error) {
         await conn.rollback();
         conn.release();

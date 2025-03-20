@@ -10,6 +10,8 @@ const {getAuthByEmail, editPassword, getAuth} = require('../../databaseUtils/use
 const {createSession, deleteSession} = require('../../databaseUtils/userUtils/session.js');
 const { createUser, getUser}= require('../../databaseUtils/userUtils/user.js');
 
+const {testEmailSender, sendVerificationEmail} = require('../../utils/emailSender.js')
+
 async function login(req, res)
 {
     try {
@@ -99,9 +101,11 @@ async function signup(req,res)
         }
     
         const passwordHash = await hashPassword(body.password);
-        const userId = await createUser(body.name,body.patLastName,body.matLastName,body.phone,body.email,passwordHash);
+        const {userId, userEmail} = await createUser(body.name,body.patLastName,body.matLastName,body.phone,body.email,passwordHash);
+
+        await sendVerificationEmail(userId, userEmail, res);
     
-        response.success(req,res,{id:userId},201);
+        response.success(req,res,'{id:userId}',201);
     } catch (error) {
         console.log(`Hubo un error con ${req.method} ${req.originalUrl}`);
         console.log(error);
