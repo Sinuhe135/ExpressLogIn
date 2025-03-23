@@ -19,12 +19,12 @@ router.post('/signup',requireNotLoggedIn, async (req,res)=>{
     await controller.signup(req,res);
 });
 
+router.get('/verify/:id/:token', async (req, res)=>{
+    await controller.verify(req,res);
+});
+
 router.put('/changePassword',requireLoggedIn,requireSession, async (req,res)=>{
     await controller.changePassword(req,res);
 });
-
-// router.post('/signupDev',requireNotLoggedIn, async (req,res)=>{
-//     await controller.signup(req,res);
-// });
 
 module.exports = router;

@@ -1,12 +1,12 @@
 const validateSignUp = require('./schemas/signup.js');
 const validateLogIn = require('./schemas/login.js');
 const validateChangePassword = require('./schemas/changePassword.js');
-const validateParamId = require('../../utils/schemas/paramId.js');
+const validateVerify = require('./schemas/verify.js')
 const response = require('../../utils/responses.js');
 const cookieProperties = require('./../../utils/cookieProperties.js')
 const bcrypt = require('bcrypt');
 const {generateAccessToken,generateRefreshToken, getRefreshMaxAgeMili} = require('../../jsonWebToken/utils.js')
-const {getAuthByEmail, editPassword, getAuth} = require('../../databaseUtils/userUtils/auth.js');
+const {getAuthByEmail, editPassword} = require('../../databaseUtils/userUtils/auth.js');
 const {createSession, deleteSession} = require('../../databaseUtils/userUtils/session.js');
 const { createUser, getUser}= require('../../databaseUtils/userUtils/user.js');
 
@@ -105,7 +105,25 @@ async function signup(req,res)
 
         await sendVerificationEmail(userId, userEmail, res);
     
-        response.success(req,res,'{id:userId}',201);
+        response.success(req,res,{id:userId},201);
+    } catch (error) {
+        console.log(`Hubo un error con ${req.method} ${req.originalUrl}`);
+        console.log(error);
+        response.error(req,res,'Hubo un error con el servidor',500);
+    }
+}
+
+async function verify(req, res) {
+    try {
+        const validation = validateVerify(req.params);
+        if(validation.error)
+        {
+            response.error(req,res,validation.error.details[0].message,400);
+            return;
+        }
+        const params = validation.value;
+
+        
     } catch (error) {
         console.log(`Hubo un error con ${req.method} ${req.originalUrl}`);
         console.log(error);
@@ -172,4 +190,4 @@ async function createJWTCookies(res, user)
     res.cookie('refreshToken',refreshToken,properties);
 }
 
-module.exports={login, signup, logout, changePassword, getCheck};
+module.exports={login, signup,verify, logout, changePassword, getCheck};

@@ -1,5 +1,7 @@
 const nodemailer = require('nodemailer');
 const {v4:uuidv4} = require('uuid');
+const bcrypt = require('bcrypt');
+const {createToken} = require('../databaseUtils/userUtils/token')
 
 let transporter = nodemailer.createTransport({
     service:"gmail",
@@ -25,20 +27,32 @@ function testEmailSender(){
 }
 
 async function sendVerificationEmail(id, email, res) {
-    const currentUrl = "http://localhost:3000/"
+    const frontVerificationUrl = "http://localhost:3000/verification/"
 
-    const token = uuidv4() + id;
-
+    const token = uuidv4();
+    console.log(token);
+// sexo
     const mailOptions = {
         from: process.env.AUTH_EMAIL,
         to: email,
         subject:'Verifica tu correo electrónico',
-        html:`<p>Verifica tu correo electónico para completar el proceso de registro en la aplicación</p>
+        html:`<p>Verifica tu correo electrónico para completar el proceso de registro en la aplicación</p>
         <p>Verifica pulsando 
-            <a href="${currentUrl +"api/auth/verify/"+id+"/"+token}">aquí</a>
+            <a href="${frontVerificationUrl +id+"/"+token}">aquí</a>
         </p>
         `,
     }
+
+    const tokenHash = await hashToken(token);
+
+    const tokenId = await createToken(tokenHash, id);
+
+    await transporter.sendMail(mailOptions);
+}
+
+async function hashToken(token) {
+    const salt = await bcrypt.genSalt();
+    return await bcrypt.hash(token.toString(),salt);
 }
 
 module.exports={testEmailSender,sendVerificationEmail}
