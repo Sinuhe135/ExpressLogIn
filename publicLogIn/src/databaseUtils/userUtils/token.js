@@ -1,14 +1,14 @@
 const pool = require('../databaseCon.js');
 
-async function createToken(token,userId)
+async function createToken(token,id)
 {
-    const [result] = await pool.query('insert into TOKEN (token,idUser) values (?,?)',[token, userId]);
+    const [result] = await pool.query('insert into TOKEN (id,token) values (?,?)',[id,token]);
     return result.insertId;
 }
 
-async function getToken(token, userId)
+async function getToken(id)
 {
-    const [rows] = await pool.query('select id, idUser, token,  from USER left join AUTH on USER.id = AUTH.id where USER.active = active and USER.id = ?',[id]);
+    const [rows] = await pool.query('select id, token, UNIX_TIMESTAMP(date) from TOKEN where id = ?',[id]);
     return rows[0];
 }
 

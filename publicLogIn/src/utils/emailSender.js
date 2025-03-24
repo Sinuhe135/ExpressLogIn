@@ -55,4 +55,18 @@ async function hashToken(token) {
     return await bcrypt.hash(token.toString(),salt);
 }
 
-module.exports={testEmailSender,sendVerificationEmail}
+function checkExpirationDate(date)
+{
+    const expirationTime = 1 * (60 * 60 * 1000); //hours, value in seconds
+
+    const tokenLimitTime = date + expirationTime;
+
+    if(Date.now() > tokenLimitTime)
+    {
+        return false;
+    }
+
+    return true;
+}
+
+module.exports={testEmailSender,sendVerificationEmail,checkExpirationDate}

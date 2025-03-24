@@ -8,13 +8,13 @@ async function getAllUsers(pageNumber)
     const pagination = 'order by USER.id desc LIMIT '+numberOfResultRows.toString()+' offset ?'; //rowsToSkip
 
     const dataSelection = 'USER.id, USER.name, USER.patLastName, USER.matLastName, USER.phone, AUTH.username, USER.type';
-    const [rows] = await pool.query('select ' + dataSelection + ' from USER left join AUTH on USER.id = AUTH.id where USER.active = 1 '+pagination,[rowsToSkip]);
+    const [rows] = await pool.query('select ' + dataSelection + ' from USER left join AUTH on USER.id = AUTH.id where USER.status = active '+pagination,[rowsToSkip]);
     return rows;
 }
 
 async function getNumberOfPages()
 {
-    const [rows] = await pool.query('select COUNT(id) as row_num from USER where active = 1');
+    const [rows] = await pool.query('select COUNT(id) as row_num from USER where status = active');
     let numberOfPages = rows[0].row_num / numberOfResultRows;
 
     if(numberOfPages !== Math.trunc(numberOfPages))
@@ -28,7 +28,7 @@ async function getNumberOfPages()
 async function getUser(id)
 {
     const dataSelection = 'USER.id, USER.name, USER.patLastName, USER.matLastName, USER.phone,USER.type, AUTH.email';
-    const [rows] = await pool.query('select ' + dataSelection + ' from USER left join AUTH on USER.id = AUTH.id where USER.active = active and USER.id = ?',[id]);
+    const [rows] = await pool.query('select ' + dataSelection + ' from USER left join AUTH on USER.id = AUTH.id where USER.status = active and USER.id = ?',[id]);
     return rows[0];
 }
 
@@ -81,4 +81,31 @@ async function createUser(name,patLastName,matLastName,phone,email,password)
     }   
 }
 
-module.exports={getAllUsers,getNumberOfPages,getUser,editUser,createUser, deleteUser};
+async function verifyUser(id)
+{
+    await pool.query('update USER set status = active where id = ?',[id]);
+    return id;
+}
+
+async function deleteUnverifiedUser(id)
+{
+    const conn = await pool.getConnection();
+    try {
+        await conn.beginTransaction();
+    
+        await pool.query('delete from TOKEN where id = ?',[id]);
+        await pool.query('delete from USER where id = ?',[id]);
+    
+        await conn.commit();
+        conn.release();
+
+        return {id:id};
+    } catch (error) {
+        await conn.rollback();
+        conn.release();
+
+        throw (error);
+    }    
+}
+
+module.exports={getAllUsers,getNumberOfPages,getUser,editUser,createUser, deleteUser, verifyUser, deleteUnverifiedUser};

@@ -8,9 +8,10 @@ const bcrypt = require('bcrypt');
 const {generateAccessToken,generateRefreshToken, getRefreshMaxAgeMili} = require('../../jsonWebToken/utils.js')
 const {getAuthByEmail, editPassword} = require('../../databaseUtils/userUtils/auth.js');
 const {createSession, deleteSession} = require('../../databaseUtils/userUtils/session.js');
-const { createUser, getUser}= require('../../databaseUtils/userUtils/user.js');
+const { createUser, getUser, verifyUser, deleteUnverifiedUser}= require('../../databaseUtils/userUtils/user.js');
+const {getToken} = require('./../../databaseUtils/userUtils/token.js')
 
-const {testEmailSender, sendVerificationEmail} = require('../../utils/emailSender.js')
+const {testEmailSender, sendVerificationEmail, checkExpirationDate} = require('../../utils/emailSender.js')
 
 async function login(req, res)
 {
@@ -40,7 +41,7 @@ async function login(req, res)
         const user = await getUser(auth.id);
         if(!user)
         {
-            nse.error(req,res,'Usuario no encontrado',404);
+            response.error(req,res,'Usuario no encontrado',404);
             return;
         }
 
@@ -101,11 +102,11 @@ async function signup(req,res)
         }
     
         const passwordHash = await hashPassword(body.password);
-        const {userId, userEmail} = await createUser(body.name,body.patLastName,body.matLastName,body.phone,body.email,passwordHash);
+        const {id, email} = await createUser(body.name,body.patLastName,body.matLastName,body.phone,body.email,passwordHash);
 
-        await sendVerificationEmail(userId, userEmail, res);
+        await sendVerificationEmail(id, email, res);
     
-        response.success(req,res,{id:userId},201);
+        response.success(req,res,{id:id},201);
     } catch (error) {
         console.log(`Hubo un error con ${req.method} ${req.originalUrl}`);
         console.log(error);
@@ -123,7 +124,40 @@ async function verify(req, res) {
         }
         const params = validation.value;
 
+        const userToken = await getToken(params.id);
+        if(!userToken)
+        {
+            response.error(req,res,'El token no se encuentra o ya ha sido verificado',400);
+            return;
+        }
+
+        const resultado = await bcrypt.compare(params.token,userToken.token);
+        if(!resultado)
+        {
+            response.error(req,res,'Token incorrecto',400);
+            return;
+        }
         
+        const tokenDate = userToken.date * 1000;
+        if(!checkExpirationDate(tokenDate))
+        {
+            await deleteUnverifiedUser(userToken.idUser);
+            
+            response.error(req,res,'Token de verificación expirado',400);
+            return;       
+        }
+
+        await verifyUser(userToken.IdUser);
+
+        const user = await getUser(userToken.idUser);
+        if(!user)
+        {
+            response.error(req,res,'Usuario no encontrado',404);
+            return;
+        }
+        await createJWTCookies(res,user);
+
+        response.success(req,res,{id:user.id,type:user.type},201);
     } catch (error) {
         console.log(`Hubo un error con ${req.method} ${req.originalUrl}`);
         console.log(error);

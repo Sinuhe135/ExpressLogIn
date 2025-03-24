@@ -2,7 +2,7 @@ const {getRefreshMaxAgeMili} = require('./../jsonWebToken/utils.js');
 const {deleteExpiredSessions} = require('./../databaseUtils/userUtils/session.js');
 
 const maxAge = getRefreshMaxAgeMili()/1000;
-const interval = 1*(24*60*60*1000);
+const interval = 1*(24*60*60*1000); //days
 
 module.exports = () =>{
     setInterval(async () => {
