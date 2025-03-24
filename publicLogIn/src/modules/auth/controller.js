@@ -5,13 +5,14 @@ const validateVerify = require('./schemas/verify.js')
 const response = require('../../utils/responses.js');
 const cookieProperties = require('./../../utils/cookieProperties.js')
 const bcrypt = require('bcrypt');
+const {v4:uuidv4} = require('uuid');
 const {generateAccessToken,generateRefreshToken, getRefreshMaxAgeMili} = require('../../jsonWebToken/utils.js')
 const {getAuthByEmail, editPassword} = require('../../databaseUtils/userUtils/auth.js');
 const {createSession, deleteSession} = require('../../databaseUtils/userUtils/session.js');
 const { createUser, getUser, verifyUser, deleteUnverifiedUser}= require('../../databaseUtils/userUtils/user.js');
 const {getToken} = require('./../../databaseUtils/userUtils/token.js')
 
-const {testEmailSender, sendVerificationEmail, checkExpirationDate} = require('../../utils/emailSender.js')
+const {testEmailSender, sendEmail} = require('../../utils/emailSender.js')
 
 async function login(req, res)
 {
@@ -101,18 +102,41 @@ async function signup(req,res)
             return;
         }
     
-        const passwordHash = await hashPassword(body.password);
-        const {id, email} = await createUser(body.name,body.patLastName,body.matLastName,body.phone,body.email,passwordHash);
+        const token = uuidv4();
+        if(process.env.NODE_ENV === 'development')
+        {
+            console.log(token);
+        }
+        const tokenHash = await hashText(token);
 
-        await sendVerificationEmail(id, email, res);
+        const passwordHash = await hashText(body.password);
+
+        const idUser = await createUser(body.name,body.patLastName,body.matLastName,body.phone,body.email,passwordHash, tokenHash);
+
+        const frontVerificationUrl = "http://localhost:3000/verification/"
+        const emailHtml = `
+            <p>Verifica tu correo electrónico para completar el proceso de registro en la aplicación</p>
+            <p>Verifica pulsando 
+                <a href="${frontVerificationUrl +idUser+"/"+token}">aquí</a>
+            </p>
+        `;
+
+        await sendEmail(body.email, 'Verifica tu correo electrónico', emailHtml);
     
-        response.success(req,res,{id:id},201);
+        response.success(req,res,{id:idUser},201);
     } catch (error) {
         console.log(`Hubo un error con ${req.method} ${req.originalUrl}`);
         console.log(error);
         response.error(req,res,'Hubo un error con el servidor',500);
     }
 }
+
+//test expiration time
+//hacer endpoint de reenvio de token al mismo email
+//mejorar endpoint de cambiar de contraseña (no prioridad)
+//pensar en posibles escenarios que se puedan complicar si hay exepciones en funciones adelante
+//si el usuario se alcanza a crear pero hay un error al enviar el correo que va a pasar
+//posible solucion: no hacer nada y si se quiere crear otra vez la cuenta y el usuario esta sin verificar, eliminarlo y volver a crear
 
 async function verify(req, res) {
     try {
@@ -127,29 +151,29 @@ async function verify(req, res) {
         const userToken = await getToken(params.id);
         if(!userToken)
         {
-            response.error(req,res,'El token no se encuentra o ya ha sido verificado',400);
+            response.error(req,res,'El token de verificación no se encuentra o ya ha sido verificado',400);
             return;
         }
 
         const resultado = await bcrypt.compare(params.token,userToken.token);
         if(!resultado)
         {
-            response.error(req,res,'Token incorrecto',400);
+            response.error(req,res,'Token de verificación incorrecto',400);
             return;
         }
         
         const tokenDate = userToken.date * 1000;
-        if(!checkExpirationDate(tokenDate))
+        if(!checkVerificationExpirationDate(tokenDate))
         {
-            await deleteUnverifiedUser(userToken.idUser);
+            await deleteUnverifiedUser(userToken.id);
             
             response.error(req,res,'Token de verificación expirado',400);
             return;       
         }
 
-        await verifyUser(userToken.IdUser);
+        await verifyUser(userToken.id);
 
-        const user = await getUser(userToken.idUser);
+        const user = await getUser(userToken.id);
         if(!user)
         {
             response.error(req,res,'Usuario no encontrado',404);
@@ -163,6 +187,20 @@ async function verify(req, res) {
         console.log(error);
         response.error(req,res,'Hubo un error con el servidor',500);
     }
+}
+
+function checkVerificationExpirationDate(date)
+{
+    const expirationTime = 1 * (60 * 60 * 1000); //hours, value in seconds
+
+    const tokenLimitTime = date + expirationTime;
+
+    if(Date.now() > tokenLimitTime)
+    {
+        return false;
+    }
+
+    return true;
 }
 
 async function changePassword(req, res)
@@ -201,9 +239,9 @@ async function changePassword(req, res)
     }
 }
 
-async function hashPassword(password) {
+async function hashText(text) {
     const salt = await bcrypt.genSalt();
-    return await bcrypt.hash(password.toString(),salt);
+    return await bcrypt.hash(text.toString(),salt);
 }
 
 async function createJWTCookies(res, user)

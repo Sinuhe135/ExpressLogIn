@@ -8,13 +8,13 @@ async function getAllUsers(pageNumber)
     const pagination = 'order by USER.id desc LIMIT '+numberOfResultRows.toString()+' offset ?'; //rowsToSkip
 
     const dataSelection = 'USER.id, USER.name, USER.patLastName, USER.matLastName, USER.phone, AUTH.username, USER.type';
-    const [rows] = await pool.query('select ' + dataSelection + ' from USER left join AUTH on USER.id = AUTH.id where USER.status = active '+pagination,[rowsToSkip]);
+    const [rows] = await pool.query('select ' + dataSelection + " from USER left join AUTH on USER.id = AUTH.id where USER.status = 'active' "+pagination,[rowsToSkip]);
     return rows;
 }
 
 async function getNumberOfPages()
 {
-    const [rows] = await pool.query('select COUNT(id) as row_num from USER where status = active');
+    const [rows] = await pool.query("select COUNT(id) as row_num from USER where status = 'active'");
     let numberOfPages = rows[0].row_num / numberOfResultRows;
 
     if(numberOfPages !== Math.trunc(numberOfPages))
@@ -28,7 +28,7 @@ async function getNumberOfPages()
 async function getUser(id)
 {
     const dataSelection = 'USER.id, USER.name, USER.patLastName, USER.matLastName, USER.phone,USER.type, AUTH.email';
-    const [rows] = await pool.query('select ' + dataSelection + ' from USER left join AUTH on USER.id = AUTH.id where USER.status = active and USER.id = ?',[id]);
+    const [rows] = await pool.query('select ' + dataSelection + " from USER left join AUTH on USER.id = AUTH.id where USER.status = 'active' and USER.id = ?",[id]);
     return rows[0];
 }
 
@@ -39,7 +39,7 @@ async function deleteUser(id)
         await conn.beginTransaction();
     
         await pool.query('delete from SESSION where idAuth = ?',[id]);
-        await pool.query('update USER set active = 0 where id = ?',[id]);
+        await pool.query("update USER set status = 'unactive' where id = ?",[id]);
         await pool.query('delete from AUTH where id = ?',[id]);
     
         await conn.commit();
@@ -60,19 +60,20 @@ async function editUser(name,patLastName,matLastName,phone,id)
     return await getUser(id);
 }
 
-async function createUser(name,patLastName,matLastName,phone,email,password)
+async function createUser(name,patLastName,matLastName,phone,email,password, token)
 {
     const conn = await pool.getConnection();
     try {
         await conn.beginTransaction();
     
         const [result] = await conn.query('insert into USER (name,patLastName,matLastName,phone) values (?,?,?,?)',[name,patLastName,matLastName,phone]);
-        await conn.query(`insert into AUTH (id,email,password) values (${result.insertId},?,?)`,[email,password]);
-    
+        await conn.query(`insert into AUTH (id,email,password) values (?,?,?)`,[result.insertId,email,password]);
+        await conn.query('insert into TOKEN (id,token) values (?,?)',[result.insertId,token]);
+        
         await conn.commit();
         conn.release();
 
-        return {id:result.insertId,email:email};
+        return result.insertId;
     } catch (error) {
         await conn.rollback();
         conn.release();
@@ -83,7 +84,7 @@ async function createUser(name,patLastName,matLastName,phone,email,password)
 
 async function verifyUser(id)
 {
-    await pool.query('update USER set status = active where id = ?',[id]);
+    await pool.query("update USER set status = 'active' where id = ?",[id]);
     return id;
 }
 
