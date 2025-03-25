@@ -84,8 +84,23 @@ async function createUser(name,patLastName,matLastName,phone,email,password, tok
 
 async function verifyUser(id)
 {
-    await pool.query("update USER set status = 'active' where id = ?",[id]);
-    return id;
+    const conn = await pool.getConnection();
+    try {
+        await conn.beginTransaction();
+    
+        await pool.query("update USER set status = 'active' where id = ?",[id]);
+        await pool.query('delete from TOKEN where id = ?',[id]);
+    
+        await conn.commit();
+        conn.release();
+
+        return id;
+    } catch (error) {
+        await conn.rollback();
+        conn.release();
+
+        throw (error);
+    }    
 }
 
 async function deleteUnverifiedUser(id)
@@ -95,6 +110,7 @@ async function deleteUnverifiedUser(id)
         await conn.beginTransaction();
     
         await pool.query('delete from TOKEN where id = ?',[id]);
+        await pool.query('delete from AUTH where id = ?',[id]);
         await pool.query('delete from USER where id = ?',[id]);
     
         await conn.commit();

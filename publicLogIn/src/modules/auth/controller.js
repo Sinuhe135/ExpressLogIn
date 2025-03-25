@@ -7,9 +7,9 @@ const cookieProperties = require('./../../utils/cookieProperties.js')
 const bcrypt = require('bcrypt');
 const {v4:uuidv4} = require('uuid');
 const {generateAccessToken,generateRefreshToken, getRefreshMaxAgeMili} = require('../../jsonWebToken/utils.js')
-const {getAuthByEmail, editPassword} = require('../../databaseUtils/userUtils/auth.js');
+const {getAuthByEmail, editPassword,checkAuthEmail} = require('../../databaseUtils/userUtils/auth.js');
 const {createSession, deleteSession} = require('../../databaseUtils/userUtils/session.js');
-const { createUser, getUser, verifyUser, deleteUnverifiedUser}= require('../../databaseUtils/userUtils/user.js');
+const { createUser, getUser, verifyUser, deleteUnverifiedUser, deleteUser}= require('../../databaseUtils/userUtils/user.js');
 const {getToken} = require('./../../databaseUtils/userUtils/token.js')
 
 const {testEmailSender, sendEmail} = require('../../utils/emailSender.js')
@@ -42,7 +42,7 @@ async function login(req, res)
         const user = await getUser(auth.id);
         if(!user)
         {
-            response.error(req,res,'Usuario no encontrado',404);
+            response.error(req,res,'Usuario no encontrado o desactivado',404);
             return;
         }
 
@@ -94,20 +94,25 @@ async function signup(req,res)
             return;
         }
         const body = validation.value;
-    
-        const auth = await getAuthByEmail(body.email);
+
+        const auth = await checkAuthEmail(body.email);
         if(auth)
         {
-            response.error(req,res,'El correo ya está registrado',400);
-            return;
+            if(auth.status !== 'unverified')
+            {
+                response.error(req,res,'El correo ya está registrado',400);
+                return;
+            }
+            
+            await deleteUnverifiedUser(auth.id);
         }
-    
+
         const token = uuidv4();
+        const tokenHash = await hashText(token);
         if(process.env.NODE_ENV === 'development')
         {
             console.log(token);
         }
-        const tokenHash = await hashText(token);
 
         const passwordHash = await hashText(body.password);
 
@@ -131,12 +136,10 @@ async function signup(req,res)
     }
 }
 
-//test expiration time
 //hacer endpoint de reenvio de token al mismo email
+//para reenviar el token hay que eliminarlo y crear otro, por el hash
 //mejorar endpoint de cambiar de contraseña (no prioridad)
 //pensar en posibles escenarios que se puedan complicar si hay exepciones en funciones adelante
-//si el usuario se alcanza a crear pero hay un error al enviar el correo que va a pasar
-//posible solucion: no hacer nada y si se quiere crear otra vez la cuenta y el usuario esta sin verificar, eliminarlo y volver a crear
 
 async function verify(req, res) {
     try {
@@ -191,7 +194,8 @@ async function verify(req, res) {
 
 function checkVerificationExpirationDate(date)
 {
-    const expirationTime = 1 * (60 * 60 * 1000); //hours, value in seconds
+    const expirationTime = 1 * (60 * 60 * 1000); //hours, value in miliseconds
+    // const expirationTime = 10 * 1000;
 
     const tokenLimitTime = date + expirationTime;
 

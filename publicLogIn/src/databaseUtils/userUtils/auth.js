@@ -12,6 +12,12 @@ async function getAuthByEmail(email)
     return rows[0]; 
 }
 
+async function checkAuthEmail(email)
+{
+    const [rows] = await pool.query('select AUTH.id, AUTH.email, USER.status from AUTH left join USER on USER.id = AUTH.id where AUTH.email = ?',[email]);
+    return rows[0]; 
+}
+
 async function editPassword(password,idAuth,idCurrentSession)
 {
     const conn = await pool.getConnection();
@@ -33,4 +39,4 @@ async function editPassword(password,idAuth,idCurrentSession)
     }   
 }
 
-module.exports={getAuthByEmail, getAuth, editPassword};
+module.exports={getAuthByEmail, getAuth, editPassword,checkAuthEmail};
