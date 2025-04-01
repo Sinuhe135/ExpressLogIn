@@ -1,18 +1,19 @@
 const validateSignUp = require('./schemas/signup.js');
 const validateLogIn = require('./schemas/login.js');
 const validateChangePassword = require('./schemas/changePassword.js');
-const validateVerify = require('./schemas/verify.js')
+const validateVerify = require('./schemas/verify.js');
+const validateParamId = require('./../../utils/schemas/paramId.js');
 const response = require('../../utils/responses.js');
 const cookieProperties = require('./../../utils/cookieProperties.js')
 const bcrypt = require('bcrypt');
 const {v4:uuidv4} = require('uuid');
 const {generateAccessToken,generateRefreshToken, getRefreshMaxAgeMili} = require('../../jsonWebToken/utils.js')
-const {getAuthByEmail, editPassword,checkAuthEmail} = require('../../databaseUtils/userUtils/auth.js');
+const {getAuthByEmail, editPassword,checkAuthEmail, getAuth} = require('../../databaseUtils/userUtils/auth.js');
 const {createSession, deleteSession} = require('../../databaseUtils/userUtils/session.js');
 const { createUser, getUser, verifyUser, deleteUnverifiedUser, deleteUser}= require('../../databaseUtils/userUtils/user.js');
-const {getToken} = require('./../../databaseUtils/userUtils/token.js')
+const {getToken, replaceToken} = require('./../../databaseUtils/userUtils/token.js')
 
-const {testEmailSender, sendEmail} = require('../../utils/emailSender.js')
+const {sendEmail} = require('../../utils/emailSender.js');
 
 async function login(req, res)
 {
@@ -109,6 +110,7 @@ async function signup(req,res)
 
         const token = uuidv4();
         const tokenHash = await hashText(token);
+
         if(process.env.NODE_ENV === 'development')
         {
             console.log(token);
@@ -118,7 +120,12 @@ async function signup(req,res)
 
         const idUser = await createUser(body.name,body.patLastName,body.matLastName,body.phone,body.email,passwordHash, tokenHash);
 
-        const frontVerificationUrl = "http://localhost:3000/verification/"
+        const frontVerificationUrl = process.env.VERIFICATION_URL;
+        if(!frontVerificationUrl)
+        {
+            throw new Error("verification url has not been set up");
+        }
+
         const emailHtml = `
             <p>Verifica tu correo electrónico para completar el proceso de registro en la aplicación</p>
             <p>Verifica pulsando 
@@ -192,6 +199,80 @@ async function verify(req, res) {
     }
 }
 
+async function reSendToken(req, res) {
+    try {
+        const validation = validateParamId(req.params);
+        if(validation.error)
+        {
+            response.error(req,res,validation.error.details[0].message,400);
+            return;
+        }
+        const params = validation.value;
+
+        const auth = await getAuth(params.id);
+        if(!auth)
+        {
+            response.error(req,res,'Usuario no encontrado',400);
+            return;
+        }
+
+        const userToken = await getToken(params.id);
+        if(!userToken)
+        {
+            response.error(req,res,'El token de verificación no se encuentra o ya ha sido verificado',400);
+            return;
+        }        
+        
+        const tokenDate = userToken.date * 1000;
+
+        const remainingResendTime = checkVerificationReSendDate(tokenDate)/1000;
+        if(remainingResendTime > 0)
+        {            
+            response.error(req,res,'Faltan '+remainingResendTime+' segundos para poder reenviar el correo',400);
+            return;       
+        }
+        else if(!checkVerificationExpirationDate(tokenDate))
+        {
+            await deleteUnverifiedUser(userToken.id);
+            
+            response.error(req,res,'Token de verificación expirado',400);
+            return;       
+        }
+
+        const token = uuidv4();
+        const tokenHash = await hashText(token);
+
+        if(process.env.NODE_ENV === 'development')
+        {
+            console.log(token);
+        }
+
+        const tokenId = await replaceToken(userToken.id, tokenHash);
+
+        const frontVerificationUrl = process.env.VERIFICATION_URL;
+        if(!frontVerificationUrl)
+        {
+            throw new Error("verification url has not been set up");
+        }
+
+        const emailHtml = `
+            <p>Verifica tu correo electrónico para completar el proceso de registro en la aplicación</p>
+            <p>Verifica pulsando 
+                <a href="${frontVerificationUrl +userToken.id+"/"+token}">aquí</a>
+            </p>
+        `;
+
+        await sendEmail(auth.email, 'Verifica tu correo electrónico', emailHtml);
+    
+        response.success(req,res,{id:userToken.id},201);
+
+    } catch (error) {
+        console.log(`Hubo un error con ${req.method} ${req.originalUrl}`);
+        console.log(error);
+        response.error(req,res,'Hubo un error con el servidor',500);
+    }
+}
+
 function checkVerificationExpirationDate(date)
 {
     const expirationTime = 1 * (60 * 60 * 1000); //hours, value in miliseconds
@@ -201,10 +282,24 @@ function checkVerificationExpirationDate(date)
 
     if(Date.now() > tokenLimitTime)
     {
-        return false;
+       return false;
     }
 
     return true;
+}
+
+function checkVerificationReSendDate(date)
+{
+    const expirationTime = 30 * (1000); //seconds, value in miliseconds
+
+    const tokenLimitTime = date + expirationTime;
+
+    if(Date.now() < tokenLimitTime)
+    {
+        return tokenLimitTime - Date.now();
+    }
+
+    return 0;
 }
 
 async function changePassword(req, res)
@@ -266,4 +361,4 @@ async function createJWTCookies(res, user)
     res.cookie('refreshToken',refreshToken,properties);
 }
 
-module.exports={login, signup,verify, logout, changePassword, getCheck};
+module.exports={login, signup,verify, logout,reSendToken, changePassword, getCheck};

@@ -6,4 +6,25 @@ async function getToken(id)
     return rows[0];
 }
 
-module.exports={getToken}
+async function replaceToken(id, token)
+{
+    const conn = await pool.getConnection();
+    try {
+        await conn.beginTransaction();
+    
+        await pool.query('delete from TOKEN where id = ?',[id]);
+        await conn.query('insert into TOKEN (id,token) values (?,?)',[id,token]);
+    
+        await conn.commit();
+        conn.release();
+
+        return id;
+    } catch (error) {
+        await conn.rollback();
+        conn.release();
+
+        throw (error);
+    }    
+}
+
+module.exports={getToken,replaceToken}

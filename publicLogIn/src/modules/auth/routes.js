@@ -23,6 +23,10 @@ router.get('/verify/:id/:token', async (req, res)=>{
     await controller.verify(req,res);
 });
 
+router.get('/reSendToken/:id', async (req, res)=>{
+    await controller.reSendToken(req,res);
+});
+
 router.put('/changePassword',requireLoggedIn,requireSession, async (req,res)=>{
     await controller.changePassword(req,res);
 });
