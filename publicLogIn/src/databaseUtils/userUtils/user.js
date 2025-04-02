@@ -7,7 +7,7 @@ async function getAllUsers(pageNumber)
     const rowsToSkip = (pageNumber-1)*numberOfResultRows;
     const pagination = 'order by USER.id desc LIMIT '+numberOfResultRows.toString()+' offset ?'; //rowsToSkip
 
-    const dataSelection = 'USER.id, USER.name, USER.patLastName, USER.matLastName, USER.phone, AUTH.username, USER.type';
+    const dataSelection = 'USER.id, USER.name, USER.patLastName, USER.matLastName, USER.phone, AUTH.email, USER.type';
     const [rows] = await pool.query('select ' + dataSelection + " from USER left join AUTH on USER.id = AUTH.id where USER.status = 'active' "+pagination,[rowsToSkip]);
     return rows;
 }
@@ -112,6 +112,34 @@ async function deleteUnverifiedUser(id)
         await pool.query('delete from TOKEN where id = ?',[id]);
         await pool.query('delete from AUTH where id = ?',[id]);
         await pool.query('delete from USER where id = ?',[id]);
+        await pool.query('delete from SESSION where idAuth = ?',[id]);
+    
+        await conn.commit();
+        conn.release();
+
+        return {id:id};
+    } catch (error) {
+        await conn.rollback();
+        conn.release();
+
+        throw (error);
+    }    
+}
+
+async function deleteAllUnverifiedUsers(maxDate)
+{
+    const conn = await pool.getConnection();
+    try {
+        await conn.beginTransaction();
+    
+        await pool.query('delete from AUTH where id = ?',[id]);
+        await pool.query('delete from USER where id = ?',[id]);
+        await pool.query('delete from SESSION where idAuth = ?',[id]);
+        await pool.query('delete from TOKEN where id = ?',[id]);
+
+//         DELETE AUTH
+// FROM AUTH LEFT OUTER JOIN USER ON AUTH.id = USER.id 
+// WHERE USER.status = 'unverified';
     
         await conn.commit();
         conn.release();

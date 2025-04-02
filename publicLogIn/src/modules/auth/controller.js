@@ -3,17 +3,22 @@ const validateLogIn = require('./schemas/login.js');
 const validateChangePassword = require('./schemas/changePassword.js');
 const validateVerify = require('./schemas/verify.js');
 const validateParamId = require('./../../utils/schemas/paramId.js');
+
 const response = require('../../utils/responses.js');
 const cookieProperties = require('./../../utils/cookieProperties.js')
+const {sendEmail} = require('../../utils/emailSender.js');
+const {checkVerificationExpirationDate, checkVerificationReSendDate} = require('./../../utils/verification.js')
+
 const bcrypt = require('bcrypt');
 const {v4:uuidv4} = require('uuid');
+
 const {generateAccessToken,generateRefreshToken, getRefreshMaxAgeMili} = require('../../jsonWebToken/utils.js')
 const {getAuthByEmail, editPassword,checkAuthEmail, getAuth} = require('../../databaseUtils/userUtils/auth.js');
 const {createSession, deleteSession} = require('../../databaseUtils/userUtils/session.js');
 const { createUser, getUser, verifyUser, deleteUnverifiedUser, deleteUser}= require('../../databaseUtils/userUtils/user.js');
 const {getToken, replaceToken} = require('./../../databaseUtils/userUtils/token.js')
 
-const {sendEmail} = require('../../utils/emailSender.js');
+
 
 async function login(req, res)
 {
@@ -85,6 +90,8 @@ async function getCheck(req, res)
     }
 }
 
+const verificationTok = 1 * (60 * 60 * 1000); //hours, value in miliseconds
+
 async function signup(req,res)
 {
     try {
@@ -143,8 +150,6 @@ async function signup(req,res)
     }
 }
 
-//hacer endpoint de reenvio de token al mismo email
-//para reenviar el token hay que eliminarlo y crear otro, por el hash
 //mejorar endpoint de cambiar de contraseña (no prioridad)
 //pensar en posibles escenarios que se puedan complicar si hay exepciones en funciones adelante
 
@@ -271,35 +276,6 @@ async function reSendToken(req, res) {
         console.log(error);
         response.error(req,res,'Hubo un error con el servidor',500);
     }
-}
-
-function checkVerificationExpirationDate(date)
-{
-    const expirationTime = 1 * (60 * 60 * 1000); //hours, value in miliseconds
-    // const expirationTime = 10 * 1000;
-
-    const tokenLimitTime = date + expirationTime;
-
-    if(Date.now() > tokenLimitTime)
-    {
-       return false;
-    }
-
-    return true;
-}
-
-function checkVerificationReSendDate(date)
-{
-    const expirationTime = 30 * (1000); //seconds, value in miliseconds
-
-    const tokenLimitTime = date + expirationTime;
-
-    if(Date.now() < tokenLimitTime)
-    {
-        return tokenLimitTime - Date.now();
-    }
-
-    return 0;
 }
 
 async function changePassword(req, res)

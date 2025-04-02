@@ -4,7 +4,7 @@ const router = require('./routesIndex');
 const corsOptions = require('./corsOptions.js');
 const response = require('./utils/responses');
 const cookieParser = require('cookie-parser');
-const deleteExpiredSessions = require('./utils/expiredSessions');
+const deleteExpiredSessions = require('./databaseUtils/dailyTasks.js');
 const httpsServer = require('./httpsServer.js');
 
 app.use(express.json());
@@ -19,7 +19,7 @@ app.all('*', (req,res,next)=>{
 
 deleteExpiredSessions();
 
-App = app;
+let App = app;
 
 if(process.env.NODE_ENV === 'vps')
 {
