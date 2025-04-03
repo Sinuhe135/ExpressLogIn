@@ -109,10 +109,10 @@ async function deleteUnverifiedUser(id)
     try {
         await conn.beginTransaction();
     
+        await pool.query('delete from SESSION where idAuth = ?',[id]);
         await pool.query('delete from TOKEN where id = ?',[id]);
         await pool.query('delete from AUTH where id = ?',[id]);
         await pool.query('delete from USER where id = ?',[id]);
-        await pool.query('delete from SESSION where idAuth = ?',[id]);
     
         await conn.commit();
         conn.release();
@@ -126,31 +126,13 @@ async function deleteUnverifiedUser(id)
     }    
 }
 
-async function deleteAllUnverifiedUsers(maxDate)
+async function getAllUnverifiedExpiredUsers(verificationExpirationTime)
 {
-    const conn = await pool.getConnection();
-    try {
-        await conn.beginTransaction();
-    
-        await pool.query('delete from AUTH where id = ?',[id]);
-        await pool.query('delete from USER where id = ?',[id]);
-        await pool.query('delete from SESSION where idAuth = ?',[id]);
-        await pool.query('delete from TOKEN where id = ?',[id]);
+    const dataSelection = 'USER.id';
+    const dateCondition ='UNIX_TIMESTAMP(current_timestamp) - UNIX_TIMESTAMP(TOKEN.date) > ?';
 
-//         DELETE AUTH
-// FROM AUTH LEFT OUTER JOIN USER ON AUTH.id = USER.id 
-// WHERE USER.status = 'unverified';
-    
-        await conn.commit();
-        conn.release();
-
-        return {id:id};
-    } catch (error) {
-        await conn.rollback();
-        conn.release();
-
-        throw (error);
-    }    
+    const [rows] = await pool.query('select ' + dataSelection + " from USER left join TOKEN on USER.id = TOKEN.id where USER.status = 'unverified' and "+dateCondition,[verificationExpirationTime]);
+    return rows;
 }
 
-module.exports={getAllUsers,getNumberOfPages,getUser,editUser,createUser, deleteUser, verifyUser, deleteUnverifiedUser};
+module.exports={getAllUsers,getNumberOfPages,getUser,editUser,createUser, deleteUser, verifyUser, deleteUnverifiedUser, getAllUnverifiedExpiredUsers};

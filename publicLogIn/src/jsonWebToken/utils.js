@@ -3,9 +3,8 @@ const jwt = require('jsonwebtoken');
 const key = process.env.JWT_KEY;
 
 //values in seconds
-const accessMaxAge = 5*(60); // hours
-const refreshMaxAge = 365*(60*60*24); //days
-//const refreshMaxAge = 10*(60);
+const accessMaxAge = 5*(60); // minutes, value in seconds
+const refreshMaxAge = 365*(60*60*24); //days, value in seconds
 
 function getAccessMaxAgeMili()
 {

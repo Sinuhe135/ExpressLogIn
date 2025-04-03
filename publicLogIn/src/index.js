@@ -4,7 +4,7 @@ const router = require('./routesIndex');
 const corsOptions = require('./corsOptions.js');
 const response = require('./utils/responses');
 const cookieParser = require('cookie-parser');
-const deleteExpiredSessions = require('./databaseUtils/dailyTasks.js');
+const dailyTasks = require('./databaseUtils/dailyTasks.js');
 const httpsServer = require('./httpsServer.js');
 
 app.use(express.json());
@@ -17,7 +17,7 @@ app.all('*', (req,res,next)=>{
     response.error(req,res,`No se encuentra ${req.method} ${req.originalUrl} en el servidor`,404);
 });
 
-deleteExpiredSessions();
+dailyTasks();
 
 let App = app;
 
